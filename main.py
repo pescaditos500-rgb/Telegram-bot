@@ -102,8 +102,13 @@ def shop(message):
     )
 
 # ===== ПОКУПКА (STARS) =====
-@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
-def buy(call):
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call):
+    chat_id = str(call.message.chat.id)
+
+    if not call.data.startswith("buy_"):
+        return
+
     prices = {
         "buy_5": (5, 3),
         "buy_15": (15, 7),
@@ -112,6 +117,8 @@ def buy(call):
     }
 
     hints, stars = prices[call.data]
+
+    bot.answer_callback_query(call.id)  # важно!
 
     bot.send_invoice(
         chat_id=call.message.chat.id,
