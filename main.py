@@ -3,9 +3,8 @@ from telebot import types
 import random
 import json
 import os
-import time
 
-TOKEN = "8710556658:AAEfSZ5sJURMmefbe7Gaxx1wVfEUv2k_Rtw"
+TOKEN = "8710556658:AAFg8OX3ghWohIJ6IGR_Otfyg0pDZSjvQoE"
 bot = telebot.TeleBot(TOKEN)
 
 DATA_FILE = "data.json"
@@ -28,7 +27,7 @@ games = {}
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("🚀 Старт", "💡 Подсказка")
-    markup.row("🛒 Магазин", "📊 Статистика игрока")
+    markup.row("🛒 Магазин", "📊 Статистика")
     return markup
 
 # ===== Старт =====
@@ -57,7 +56,7 @@ def shop(message):
     markup.add(types.InlineKeyboardButton("5 подсказок — 3⭐", callback_data="buy_5"))
     markup.add(types.InlineKeyboardButton("15 подсказок — 7⭐", callback_data="buy_15"))
     markup.add(types.InlineKeyboardButton("25 подсказок — 11⭐", callback_data="buy_25"))
-    markup.add(types.InlineKeyboardButton("🔥 50 подсказок — 17⭐ (ВЫГОДНО)", callback_data="buy_50"))
+    markup.add(types.InlineKeyboardButton("🔥 50 подсказок — 17⭐ (ВЫГОДА 22%)", callback_data="buy_50"))
 
     bot.send_message(
         message.chat.id,
@@ -65,7 +64,7 @@ def shop(message):
         "5 подсказок — 3⭐\n"
         "15 подсказок — 7⭐\n"
         "25 подсказок — 11⭐\n"
-        "🔥 50 подсказок — 17⭐ (ВЫГОДА 22%)",
+        "🔥 50 подсказок — 17⭐ (ВЫГОДНО!)",
         reply_markup=markup
     )
 
@@ -81,21 +80,21 @@ def buy(call):
 
     hints, stars = prices[call.data]
 
-   bot.send_invoice(
-    chat_id=call.message.chat.id,
-    title="Покупка подсказок",
-    description=f"{hints} подсказок",
-    invoice_payload=call.data,
-    currency="XTR",
-    prices=[types.LabeledPrice("Подсказки", stars)]
-)
+    bot.send_invoice(
+        chat_id=call.message.chat.id,
+        title="Покупка подсказок",
+        description=f"{hints} подсказок",
+        invoice_payload=call.data,
+        currency="XTR",
+        prices=[types.LabeledPrice("Подсказки", stars)]
     )
 
-# ===== Оплата =====
+# ===== Подтверждение оплаты =====
 @bot.pre_checkout_query_handler(func=lambda q: True)
 def checkout(q):
     bot.answer_pre_checkout_query(q.id, ok=True)
 
+# ===== Успешная оплата =====
 @bot.message_handler(content_types=['successful_payment'])
 def got_payment(message):
     chat_id = str(message.chat.id)
@@ -112,7 +111,7 @@ def got_payment(message):
 
     save_data()
 
-    bot.send_message(message.chat.id, "✅ Покупка успешна!")
+    bot.send_message(message.chat.id, "✅ Оплата прошла! Подсказки начислены")
 
 # ===== Игра =====
 @bot.message_handler(func=lambda message: True)
@@ -122,25 +121,27 @@ def game(message):
 
     if text == "🚀 Старт":
         games[chat_id] = random.randint(1, 100)
-        bot.send_message(message.chat.id, "Я загадал число от 1 до 100")
+        bot.send_message(message.chat.id, "🎮 Я загадал число от 1 до 100")
         return
 
     if text == "💡 Подсказка":
         if users[chat_id]["hints"] <= 0:
             bot.send_message(message.chat.id, "❌ Нет подсказок")
             return
+
         if chat_id not in games:
             bot.send_message(message.chat.id, "Нажми 🚀 Старт")
             return
 
         users[chat_id]["hints"] -= 1
         number = games[chat_id]
-        bot.send_message(message.chat.id, f"Первая цифра: {str(number)[0]}")
+        bot.send_message(message.chat.id, f"💡 Первая цифра: {str(number)[0]}")
+        save_data()
         return
 
     if text == "📊 Стата":
         u = users[chat_id]
-        bot.send_message(message.chat.id, f"Победы: {u['wins']}\nПодсказки: {u['hints']}")
+        bot.send_message(message.chat.id, f"🏆 Победы: {u['wins']}\n💡 Подсказки: {u['hints']}")
         return
 
     if chat_id not in games:
@@ -154,15 +155,15 @@ def game(message):
     number = games[chat_id]
 
     if guess < number:
-        bot.send_message(message.chat.id, "Больше")
+        bot.send_message(message.chat.id, "🔼 Больше")
     elif guess > number:
-        bot.send_message(message.chat.id, "Меньше")
+        bot.send_message(message.chat.id, "🔽 Меньше")
     else:
         users[chat_id]["wins"] += 1
         save_data()
-        bot.send_message(message.chat.id, "🎉 Угадал!")
+        bot.send_message(message.chat.id, "🎉 Ты угадал!")
         del games[chat_id]
 
 # ===== Запуск =====
-print("БОТ ЗАПУЩЕН")
+print("БОТ ЗАПУЩЕН 🚀")
 bot.infinity_polling()
