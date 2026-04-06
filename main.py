@@ -88,7 +88,7 @@ def top_func(message):
 # ====== МАГАЗИН ======
 def shop_menu():
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("💡 5 подсказок — 3⭐","💡 5 подсказок — 3⭐", callback_data="buy_hints"))
+    markup.add(types.InlineKeyboardButton("💡 5 подсказок — 3⭐","💡 10 подсказок — 5⭐","💡 25 подсказок — 12⭐", callback_data="buy_hints"))
     return markup
 
 @bot.message_handler(func=lambda m: m.text == "🛒 Магазин")
