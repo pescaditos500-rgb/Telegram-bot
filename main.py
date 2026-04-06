@@ -72,16 +72,16 @@ def handle(call):
 
     hints, stars = prices[call.data]
 
-    bot.send_invoice(
-        chat_id=call.message.chat.id,
-        title="Подсказки",
-        description=f"{hints} подсказок",
-        payload=call.data,
-        currency="XTR",
-        prices=[types.LabeledPrice("Подсказки", stars)],
-        start_parameter="buy"
-    )
-
+   bot.send_invoice(
+    chat_id=call.message.chat.id,
+    title="Подсказки",
+    description=f"{hints} подсказок",
+    payload=call.data,
+    provider_token="",   # ВОТ ЭТО ДОБАВЬ
+    currency="XTR",
+    prices=[types.LabeledPrice("Подсказки", stars)],
+    start_parameter="buy"
+)
 # ===== ОБЯЗАТЕЛЬНО =====
 @bot.pre_checkout_query_handler(func=lambda q: True)
 def checkout(q):
