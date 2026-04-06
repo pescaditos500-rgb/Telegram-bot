@@ -132,10 +132,10 @@ def accept_match(call):
 @bot.message_handler(func=lambda m: m.text == "🛒 Магазин")
 def shop(message):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("5 — 3⭐", callback_data="buy_5"))
-    kb.add(types.InlineKeyboardButton("15 — 7⭐", callback_data="buy_15"))
-    kb.add(types.InlineKeyboardButton("25 — 11⭐", callback_data="buy_25"))
-    kb.add(types.InlineKeyboardButton("50 — 17⭐", callback_data="buy_50"))
+    kb.add(types.InlineKeyboardButton("5 подскзок — 3⭐", callback_data="buy_5"))
+    kb.add(types.InlineKeyboardButton("15 подсказок — 7⭐", callback_data="buy_15"))
+    kb.add(types.InlineKeyboardButton("25 подсказок — 11⭐", callback_data="buy_25"))
+    kb.add(types.InlineKeyboardButton("50 подсказок (ВЫГОДНО!!!)— 17⭐", callback_data="buy_50"))
     bot.send_message(message.chat.id, "🛒 Магазин", reply_markup=kb)
 
 # ===== ПОКУПКА =====
