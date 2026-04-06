@@ -11,7 +11,6 @@ load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
-PROVIDER_TOKEN = os.getenv("PROVIDER_TOKEN")
 COMMISSION = int(os.getenv("COMMISSION", 7))
 TURN_TIME = int(os.getenv("TURN_TIME", 30))
 
@@ -153,16 +152,15 @@ def buy(call):
 
     hints, stars = prices[call.data]
 
-    bot.send_invoice(
-        call.message.chat.id,
-        "Подсказки",
-        f"{hints} подсказок",
-        call.data,
-        PROVIDER_TOKEN,
-        "XTR",
-        [types.LabeledPrice("Подсказки", stars)]
-    )
-
+   bot.send_invoice(
+    call.message.chat.id,
+    "Подсказки",
+    f"{hints} подсказок",
+    call.data,
+    "",  # ⭐ ВАЖНО: пусто!
+    "XTR",
+    [types.LabeledPrice("Подсказки", stars)]
+)
 @bot.pre_checkout_query_handler(func=lambda q: True)
 def checkout(q):
     bot.answer_pre_checkout_query(q.id, ok=True)
