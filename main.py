@@ -4,11 +4,30 @@ import random
 import json
 import os
 import time
+import threading
+from dotenv import load_dotenv
 
-TOKEN = "8710556658:AAGG4D7iHwD-tGiu6zsb4qiV-nH7d47cbh4"
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
+PROVIDER_TOKEN = os.getenv("PROVIDER_TOKEN")
+COMMISSION = int(os.getenv("COMMISSION", 7))
+TURN_TIME = int(os.getenv("TURN_TIME", 30))
+
 bot = telebot.TeleBot(TOKEN)
 
 DATA_FILE = "data.json"
+
+# ===== АНТИСПАМ =====
+last_action = {}
+
+def anti_spam(uid):
+    now = time.time()
+    if uid in last_action and now - last_action[uid] < 1:
+        return False
+    last_action[uid] = now
+    return True
 
 # ===== ДАННЫЕ =====
 def load_data():
@@ -22,46 +41,108 @@ def save_data():
         json.dump(users, f, ensure_ascii=False, indent=4)
 
 users = load_data()
-games = {}
+
+def create_user(uid, name):
+    if uid not in users:
+        users[uid] = {
+            "nick": name,
+            "wins": 0,
+            "loses": 0,
+            "rating": 1000,
+            "hints": 3,
+            "last_daily": 0
+        }
+
+# ===== ИГРЫ =====
+pve_games = {}
+pvp_games = {}
+
+# ===== ELO =====
+def update_elo(winner, loser):
+    K = 32
+    r1 = users[winner]["rating"]
+    r2 = users[loser]["rating"]
+
+    e1 = 1 / (1 + 10 ** ((r2 - r1) / 400))
+    e2 = 1 / (1 + 10 ** ((r1 - r2) / 400))
+
+    users[winner]["rating"] = int(r1 + K * (1 - e1))
+    users[loser]["rating"] = int(r2 + K * (0 - e2))
+    save_data()
 
 # ===== МЕНЮ =====
 def menu():
     m = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    m.row("🚀 Старт", "💡 Подсказка")
-    m.row("🛒 Магазин", "📊 Стата")
+    m.row("🤖 PvE", "⚔️ PvP")
+    m.row("💡 Подсказка", "👤 Профиль")
     m.row("🏆 Топ", "🎁 Daily")
+    m.row("🛒 Магазин")
     return m
 
 # ===== START =====
 @bot.message_handler(commands=['start'])
 def start(message):
-    chat_id = str(message.chat.id)
+    uid = str(message.chat.id)
+    create_user(uid, message.from_user.first_name)
+    save_data()
+    bot.send_message(uid, "🎮 Добро пожаловать!", reply_markup=menu())
 
-    if chat_id not in users:
-        users[chat_id] = {"wins": 0, "hints": 3, "last": 0}
-        save_data()
+# ===== PvE =====
+@bot.message_handler(func=lambda m: m.text == "🤖 PvE")
+def pve_start(message):
+    uid = str(message.chat.id)
+    if not anti_spam(uid): return
 
-    bot.send_message(chat_id, "👋 Привет", reply_markup=menu())
+    pve_games[uid] = random.randint(1, 1000)
+    bot.send_message(uid, "🤖 Я загадал число 1-1000")
+
+# ===== PvP INVITE =====
+@bot.message_handler(func=lambda m: m.text == "⚔️ PvP")
+def pvp_invite(message):
+    uid = str(message.chat.id)
+
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("✅ Принять матч", callback_data=f"accept_{uid}"))
+
+    bot.send_message(uid, "🎮 Нажми и отправь другу для PvP", reply_markup=kb)
+
+# ===== ACCEPT =====
+@bot.callback_query_handler(func=lambda c: c.data.startswith("accept_"))
+def accept_match(call):
+    p1 = call.data.split("_")[1]
+    p2 = str(call.message.chat.id)
+
+    if p1 == p2:
+        return
+
+    gid = str(time.time())
+
+    pvp_games[gid] = {
+        "p1": p1,
+        "p2": p2,
+        "bet": 10,
+        "numbers": {},
+        "turn": None,
+        "last_move": time.time()
+    }
+
+    bot.send_message(p1, "🎯 Введи число 1-1000")
+    bot.send_message(p2, "🎯 Введи число 1-1000")
 
 # ===== МАГАЗИН =====
 @bot.message_handler(func=lambda m: m.text == "🛒 Магазин")
 def shop(message):
     kb = types.InlineKeyboardMarkup()
-
-    kb.add(types.InlineKeyboardButton("5 подсказок — 3⭐", callback_data="buy_5"))
-    kb.add(types.InlineKeyboardButton("15 подсказок — 7⭐", callback_data="buy_15"))
-    kb.add(types.InlineKeyboardButton("25 подсказок — 11⭐", callback_data="buy_25"))
-    kb.add(types.InlineKeyboardButton("🔥 50 подсказок — 17⭐", callback_data="buy_50"))
-
+    kb.add(types.InlineKeyboardButton("5 — 3⭐", callback_data="buy_5"))
+    kb.add(types.InlineKeyboardButton("15 — 7⭐", callback_data="buy_15"))
+    kb.add(types.InlineKeyboardButton("25 — 11⭐", callback_data="buy_25"))
+    kb.add(types.InlineKeyboardButton("50 — 17⭐", callback_data="buy_50"))
     bot.send_message(message.chat.id, "🛒 Магазин", reply_markup=kb)
 
-# ===== КНОПКИ ПОКУПКИ (САМОЕ ВАЖНОЕ) =====
-@bot.callback_query_handler(func=lambda call: True)
-def handle(call):
+# ===== ПОКУПКА =====
+@bot.callback_query_handler(func=lambda c: c.data.startswith("buy_"))
+def buy(call):
     bot.answer_callback_query(call.id)
-
-    if not call.data.startswith("buy_"):
-        return
 
     prices = {
         "buy_5": (5, 3),
@@ -72,25 +153,23 @@ def handle(call):
 
     hints, stars = prices[call.data]
 
-   bot.send_invoice(
-    call.message.chat.id,
-    "Подсказки",
-    f"{hints} подсказок",
-    call.data,
-    "",  # provider_token для Stars (ОБЯЗАТЕЛЬНО)
-    "XTR",
-    [types.LabeledPrice("Подсказки", stars)],
-    start_parameter="buy"
-)
-# ===== ОБЯЗАТЕЛЬНО =====
+    bot.send_invoice(
+        call.message.chat.id,
+        "Подсказки",
+        f"{hints} подсказок",
+        call.data,
+        PROVIDER_TOKEN,
+        "XTR",
+        [types.LabeledPrice("Подсказки", stars)]
+    )
+
 @bot.pre_checkout_query_handler(func=lambda q: True)
 def checkout(q):
     bot.answer_pre_checkout_query(q.id, ok=True)
 
-# ===== ПОСЛЕ ОПЛАТЫ =====
 @bot.message_handler(content_types=['successful_payment'])
 def pay(message):
-    chat_id = str(message.chat.id)
+    uid = str(message.chat.id)
 
     data = {
         "buy_5": 5,
@@ -100,84 +179,189 @@ def pay(message):
     }
 
     payload = message.successful_payment.invoice_payload
-
-    users[chat_id]["hints"] += data[payload]
+    users[uid]["hints"] += data[payload]
     save_data()
 
-    bot.send_message(chat_id, f"✅ +{data[payload]} подсказок")
+    bot.send_message(uid, f"✅ +{data[payload]} подсказок")
 
-# ===== ИГРА =====
+# ===== ПОДСКАЗКА =====
+@bot.message_handler(func=lambda m: m.text == "💡 Подсказка")
+def hint(message):
+    uid = str(message.chat.id)
+
+    # PvE
+    if uid in pve_games:
+        if users[uid]["hints"] <= 0:
+            bot.send_message(uid, "❌ Нет подсказок")
+            return
+
+        users[uid]["hints"] -= 1
+        num = pve_games[uid]
+        save_data()
+
+        bot.send_message(uid, f"🔍 Первая цифра: {str(num)[0]}")
+        return
+
+    # PvP
+    for game in pvp_games.values():
+        if uid in [game["p1"], game["p2"]]:
+            opponent = game["p1"] if uid == game["p2"] else game["p2"]
+
+            if users[uid]["hints"] <= 0:
+                bot.send_message(uid, "❌ Нет подсказок")
+                return
+
+            num = game["numbers"].get(opponent)
+            if not num:
+                bot.send_message(uid, "⏳ Соперник ещё не загадал")
+                return
+
+            users[uid]["hints"] -= 1
+            save_data()
+
+            bot.send_message(uid, f"🔍 Первая цифра: {str(num)[0]}")
+            return
+
+# ===== DAILY =====
+@bot.message_handler(func=lambda m: m.text == "🎁 Daily")
+def daily(message):
+    uid = str(message.chat.id)
+    now = time.time()
+
+    if now - users[uid]["last_daily"] < 86400:
+        bot.send_message(uid, "⏳ Уже забрал")
+        return
+
+    reward = random.randint(1, 7)
+    users[uid]["last_daily"] = now
+    users[uid]["hints"] += reward
+    save_data()
+
+    bot.send_message(uid, f"🎁 +{reward} подсказок")
+
+# ===== ПРОФИЛЬ =====
+@bot.message_handler(func=lambda m: m.text == "👤 Профиль")
+def profile(message):
+    uid = str(message.chat.id)
+    u = users[uid]
+
+    bot.send_message(uid,
+        f"👤 {u['nick']}\n"
+        f"🏆 {u['wins']} | 💀 {u['loses']}\n"
+        f"⭐ {u['rating']}\n"
+        f"💡 {u['hints']}"
+    )
+
+# ===== ТОП =====
+@bot.message_handler(func=lambda m: m.text == "🏆 Топ")
+def top(message):
+    sorted_users = sorted(users.items(), key=lambda x: x[1]["rating"], reverse=True)
+
+    text = "🏆 ТОП 10\n\n"
+    for i, (uid, u) in enumerate(sorted_users[:10], 1):
+        text += f"{i}. {u['nick']} — {u['rating']}\n"
+
+    bot.send_message(message.chat.id, text)
+
+# ===== PvP TIMEOUT =====
+def timeout_loop():
+    while True:
+        now = time.time()
+
+        for gid, game in list(pvp_games.items()):
+            if game["turn"] and now - game["last_move"] > TURN_TIME:
+                loser = game["turn"]
+                winner = game["p1"] if loser == game["p2"] else game["p2"]
+
+                bot.send_message(loser, "⏱ Ты проиграл по времени")
+                bot.send_message(winner, "🏆 Победа")
+
+                update_elo(winner, loser)
+                del pvp_games[gid]
+
+        time.sleep(5)
+
+threading.Thread(target=timeout_loop, daemon=True).start()
+
+# ===== ОСНОВНАЯ ИГРА =====
 @bot.message_handler(func=lambda m: True)
 def game(message):
-    chat_id = str(message.chat.id)
-    text = message.text
+    uid = str(message.chat.id)
 
-    if text == "🚀 Старт":
-        games[chat_id] = random.randint(1, 100)
-        bot.send_message(chat_id, "Я загадал число 1-100")
+    if not anti_spam(uid): return
+
+    # PvE
+    if uid in pve_games:
+        if not message.text.isdigit(): return
+
+        num = int(message.text)
+        target = pve_games[uid]
+
+        if num < target:
+            bot.send_message(uid, "⬆️ Больше")
+        elif num > target:
+            bot.send_message(uid, "⬇️ Меньше")
+        else:
+            bot.send_message(uid, "🎉 Победа")
+            users[uid]["wins"] += 1
+            save_data()
+            del pve_games[uid]
         return
 
-    if text == "💡 Подсказка":
-        if users[chat_id]["hints"] <= 0:
-            bot.send_message(chat_id, "❌ Нет подсказок")
+    # PvP
+    for gid, game in pvp_games.items():
+        if uid not in [game["p1"], game["p2"]]:
+            continue
+
+        if uid not in game["numbers"]:
+            if not message.text.isdigit(): return
+            num = int(message.text)
+
+            if not 1 <= num <= 1000:
+                return
+
+            game["numbers"][uid] = num
+            bot.send_message(uid, "✅ Сохранено")
+
+            if len(game["numbers"]) == 2:
+                game["turn"] = game["p1"]
+                game["last_move"] = time.time()
+                bot.send_message(game["p1"], "🎮 Твой ход")
+                bot.send_message(game["p2"], "⏳ Ход соперника")
             return
 
-        if chat_id not in games:
-            bot.send_message(chat_id, "Нажми старт")
+        if game["turn"] != uid:
+            bot.send_message(uid, "⏳ Не твой ход")
             return
 
-        users[chat_id]["hints"] -= 1
-        save_data()
+        if not message.text.isdigit(): return
 
-        num = games[chat_id]
-        bot.send_message(chat_id, f"Первая цифра: {str(num)[0]}")
-        return
+        guess = int(message.text)
+        opponent = game["p1"] if uid == game["p2"] else game["p2"]
+        target = game["numbers"][opponent]
 
-    if text == "📊 Стата":
-        u = users[chat_id]
-        bot.send_message(chat_id, f"🏆 {u['wins']}\n💡 {u['hints']}")
-        return
+        if guess < target:
+            bot.send_message(uid, "⬆️ Больше")
+        elif guess > target:
+            bot.send_message(uid, "⬇️ Меньше")
+        else:
+            total = game["bet"] * 2
+            commission = int(total * COMMISSION / 100)
 
-    if text == "🏆 Топ":
-        top = sorted(users.values(), key=lambda x: x["wins"], reverse=True)
-        t = "🏆 ТОП\n"
-        for i, u in enumerate(top[:10], 1):
-            t += f"{i}. {u['wins']}\n"
-        bot.send_message(chat_id, t)
-        return
+            bot.send_message(uid, "🏆 Победа")
+            bot.send_message(opponent, "💀 Проигрыш")
 
-    if text == "🎁 Daily":
-        now = time.time()
-        if now - users[chat_id]["last"] < 86400:
-            bot.send_message(chat_id, "⏳ Уже брал")
+            update_elo(uid, opponent)
+
+            if ADMIN_ID:
+                bot.send_message(ADMIN_ID, f"💰 {commission}")
+
+            del pvp_games[gid]
             return
 
-        users[chat_id]["last"] = now
-        users[chat_id]["hints"] += 2
-        save_data()
+        game["turn"] = opponent
+        game["last_move"] = time.time()
+        bot.send_message(opponent, "🎮 Твой ход")
 
-        bot.send_message(chat_id, "🎁 +2 подсказки")
-        return
-
-    if chat_id not in games:
-        return
-
-    try:
-        guess = int(text)
-    except:
-        return
-
-    num = games[chat_id]
-
-    if guess < num:
-        bot.send_message(chat_id, "🔼 Больше")
-    elif guess > num:
-        bot.send_message(chat_id, "🔽 Меньше")
-    else:
-        bot.send_message(chat_id, "🎉 Победа")
-        users[chat_id]["wins"] += 1
-        save_data()
-        del games[chat_id]
-
-print("БОТ РАБОТАЕТ")
+print("🚀 BOT STARTED")
 bot.infinity_polling()
