@@ -58,6 +58,7 @@ def shop(message):
 # ===== КНОПКИ ПОКУПКИ (САМОЕ ВАЖНОЕ) =====
 @bot.callback_query_handler(func=lambda call: True)
 def handle(call):
+    print("НАЖАЛИ КНОПКУ:", call.data)
     bot.answer_callback_query(call.id)
 
     if not call.data.startswith("buy_"):
