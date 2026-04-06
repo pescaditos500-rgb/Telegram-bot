@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TOKEN = os.getenv("8710556658:AAGG4D7iHwD-tGiu6zsb4qiV-nH7d47cbh4")
+TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 PROVIDER_TOKEN = os.getenv("PROVIDER_TOKEN")
 COMMISSION = int(os.getenv("COMMISSION", 7))
