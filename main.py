@@ -73,13 +73,13 @@ def handle(call):
     hints, stars = prices[call.data]
 
    bot.send_invoice(
-    chat_id=call.message.chat.id,
-    title="Подсказки",
-    description=f"{hints} подсказок",
-    payload=call.data,
-    provider_token="",   # ВОТ ЭТО ДОБАВЬ
-    currency="XTR",
-    prices=[types.LabeledPrice("Подсказки", stars)],
+    call.message.chat.id,
+    "Подсказки",
+    f"{hints} подсказок",
+    call.data,
+    "",  # provider_token для Stars (ОБЯЗАТЕЛЬНО)
+    "XTR",
+    [types.LabeledPrice("Подсказки", stars)],
     start_parameter="buy"
 )
 # ===== ОБЯЗАТЕЛЬНО =====
