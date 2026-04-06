@@ -5,7 +5,7 @@ import json
 import os
 import time
 
-TOKEN = "ТВОЙ_ТОКЕН"
+TOKEN = "8710556658:AAEfSZ5sJURMmefbe7Gaxx1wVfEUv2k_Rtw"
 bot = telebot.TeleBot(TOKEN)
 
 DATA_FILE = "data.json"
