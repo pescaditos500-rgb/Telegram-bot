@@ -58,7 +58,6 @@ def shop(message):
 # ===== КНОПКИ ПОКУПКИ (САМОЕ ВАЖНОЕ) =====
 @bot.callback_query_handler(func=lambda call: True)
 def handle(call):
-    print("НАЖАЛИ КНОПКУ:", call.data)
     bot.answer_callback_query(call.id)
 
     if not call.data.startswith("buy_"):
@@ -73,15 +72,15 @@ def handle(call):
 
     hints, stars = prices[call.data]
 
-   bot.send_invoice(
-    chat_id=call.message.chat.id,
-    title="Подсказки",
-    description=f"{hints} подсказок",
-    payload=call.data,
-    currency="XTR",
-    prices=[types.LabeledPrice("Подсказки", stars)],
-    start_parameter="buy"
-)
+    bot.send_invoice(
+        chat_id=call.message.chat.id,
+        title="Подсказки",
+        description=f"{hints} подсказок",
+        payload=call.data,
+        currency="XTR",
+        prices=[types.LabeledPrice("Подсказки", stars)],
+        start_parameter="buy"
+    )
 
 # ===== ОБЯЗАТЕЛЬНО =====
 @bot.pre_checkout_query_handler(func=lambda q: True)
